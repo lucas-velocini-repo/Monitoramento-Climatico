@@ -1,0 +1,18 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<BorlandProject>
+	<Transactions>
+    <Transaction>2025/10/16 14:24:49.000.278,C:\Users\Lucas Velocini\Documents\Embarcadero\Studio\Projects\Project1.dproj=C:\Users\Lucas Velocini\Documents\Embarcadero\Studio\Projects\AplicativoFM649\ServidorHorse\ServerMonitoramentoRios_Horse.dproj</Transaction>
+    <Transaction>2025/10/25 16:22:36.000.585,=C:\Users\Lucas Velocini\Documents\Embarcadero\Studio\Projects\AplicativoFM649\ServidorHorse\Unit1.pas</Transaction>
+    <Transaction>2025/10/25 16:22:55.000.323,C:\Users\Lucas Velocini\Documents\Embarcadero\Studio\Projects\AplicativoFM649\ServidorHorse\Unit1.pas=C:\Users\Lucas Velocini\Documents\Embarcadero\Studio\Projects\AplicativoFM649\ServidorHorse\Controller\Controller.sensores.pas</Transaction>
+    <Transaction>2025/10/25 16:43:15.000.049,=C:\Users\Lucas Velocini\Documents\Embarcadero\Studio\Projects\AplicativoFM649\ServidorHorse\Model\Model.Connection.pas</Transaction>
+    <Transaction>2025/10/25 17:00:07.000.449,=C:\Users\Lucas Velocini\Documents\Embarcadero\Studio\Projects\AplicativoFM649\ServidorHorse\Unit1.pas</Transaction>
+    <Transaction>2025/10/25 17:00:45.000.808,C:\Users\Lucas Velocini\Documents\Embarcadero\Studio\Projects\AplicativoFM649\ServidorHorse\Model\Model.Sensores.pas=C:\Users\Lucas Velocini\Documents\Embarcadero\Studio\Projects\AplicativoFM649\ServidorHorse\Unit1.pas</Transaction>
+  </Transactions>
+	<ProjectSortOrder AutoSort="0" SortType="0">
+    <File Path="Controller"/>
+    <File Path="Controller\Controller.sensores.pas"/>
+    <File Path="Model"/>
+    <File Path="Model\Model.Connection.pas"/>
+    <File Path="Model\Model.Sensores.pas"/>
+  </ProjectSortOrder>
+</BorlandProject>

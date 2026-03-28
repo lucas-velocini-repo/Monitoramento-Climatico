@@ -1,0 +1,47 @@
+program ServerMonitoramentoRios_Horse;
+
+{$APPTYPE CONSOLE}
+
+{$R *.res}
+
+uses
+  Horse,
+  System.JSON,
+  Horse.Jhonson,
+  System.SysUtils,
+  Controller.sensores in 'Controller\Controller.sensores.pas';
+
+begin
+  THorse.Use(Jhonson());
+
+  THorse.Post('/sensores',
+    procedure(Req: THorseRequest; Res: THorseResponse; Next: TProc)
+    var
+      Data: TJSONObject;
+      //DadosString: String;
+    begin
+        Data := Req.Body<TJSONObject>;
+        //DadosString := Req.Body;
+        Writeln('Post Recebido em /sensores - ' + DateTimeToStr(Now));
+        Writeln('');
+        Writeln('Conteúdo: ' + Data.ToString);
+        //Writeln('Conteúdo: ' + DadosString);
+        Writeln('=================================================================================');
+        Writeln('');
+        Res.Send('Post Recebido no servidor em /sensores - ' + DateTimeToStr(Now));
+    end);
+
+
+  Writeln('*====================================================================*');
+  Writeln('|                    Servidor Horse iniciado!                        |');
+  Writeln('|                                                                    |');
+  Writeln('|                         PINK FLUIDOS                               |');
+  Writeln('|   Monitoramento de Rios com Alertas Preventivos para População     |');
+  Writeln('|                                                                    |');
+  Writeln('|                 Ouvindo em: http://localhost:9000                  |');
+  Writeln('*====================================================================*');
+  Writeln('');
+  Writeln('');
+  Writeln('');
+  THorse.Listen(9000)
+end.

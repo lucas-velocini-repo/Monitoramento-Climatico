@@ -1,0 +1,470 @@
+unit Model.Sensores;
+
+interface
+
+uses FireDAC.Comp.Client, Data.DB, System.SysUtils, Model.Connection;
+
+type
+    TSensores = class
+    private
+        FDEVICE_ID: string;
+        FDEVICE_TYPE: string;
+        FLATITUDE: Double;
+        FLONGITUDE: Double;
+        FDESCRIPTION: string;
+        FDATETIME: string;
+        FRAIN_MM: Double;
+        FWATER_LEVEL: Double;
+        FRAIN_INTENSITY: Double;
+        FBATTERY_VOLTAGE: Double;
+        FSIGNAL_LORA: string;
+        FSTATUS: string;
+
+    public
+        constructor Create;
+        destructor Destroy; override;
+        property DEVICE_ID : string read FDEVICE_ID write FDEVICE_ID;
+        property DEVICE_TYPE : string read FDEVICE_TYPE write FDEVICE_TYPE;
+        property LATITUDE : Double read FLATITUDE write FLATITUDE;
+        property LONGITUDE : Double read FLONGITUDE write FLONGITUDE;
+        property DESCRIPTION : string read FDESCRIPTION write FDESCRIPTION;
+        property DATETIME : string read FDATETIME write FDATETIME;
+        property RAIN_MM : Double read FRAIN_MM write FRAIN_MM;
+        property WATER_LEVEL : Double read FWATER_LEVEL write FWATER_LEVEL;
+        property RAIN_INTENSITY : Double read FRAIN_INTENSITY write FRAIN_INTENSITY;
+        property BATTERY_VOLTAGE : Double read FBATTERY_VOLTAGE write FBATTERY_VOLTAGE;
+        property SIGNAL_LORA : string read FSIGNAL_LORA write FSIGNAL_LORA;
+        property STATUS : string read FSTATUS write FSTATUS;
+
+        function ListarRegistroNivelRio(order_by: string; out erro: string): TFDQuery;
+        function ListarRegistroPluv(order_by: string; out erro: string): TFDQuery;
+        function ListarModulosTodos(order_by: string; out erro: string): TFDQuery;
+        function ListarModulosPluv(order_by: string; out erro: string): TFDQuery;
+        function ListarModulosNivel(order_by: string; out erro: string): TFDQuery;
+        function ListarModulosAlerta(order_by: string; out erro: string): TFDQuery;
+        function Inserir(out erro: string): Boolean;
+        //function Excluir(out erro: string): Boolean;
+        //function Editar(out erro: string): Boolean;
+end;
+
+implementation
+
+{ TCliente }
+
+constructor TSensores.Create;
+begin
+    Model.Connection.Connect;
+end;
+
+destructor TSensores.Destroy;
+begin
+    Model.Connection.Disconect;
+end;
+
+function TSensores.Inserir(out erro: string): Boolean;
+var
+  qry: TFDQuery;
+begin
+  // Validação básica
+  if DEVICE_ID.IsEmpty then
+  begin
+    Result := False;
+    erro := 'O DEVICE_ID não foi informado.';
+    Exit;
+  end;
+
+  try
+    qry := TFDQuery.Create(nil);
+    qry.Connection := Model.Connection.FConnection;
+
+    with qry do
+    begin
+      // Inserir / atualizar device
+      Active := False;
+      SQL.Clear;
+      SQL.Add('INSERT OR IGNORE INTO devices (device_id, device_type, latitude, longitude, description)');
+      SQL.Add('VALUES (:device_id, :device_type, :latitude, :longitude, :description)');
+
+      ParamByName('device_id').AsString := DEVICE_ID;
+      ParamByName('device_type').AsString := DEVICE_TYPE;
+      ParamByName('latitude').AsFloat := LATITUDE;
+      ParamByName('longitude').AsFloat := LONGITUDE;
+      ParamByName('description').AsString := DESCRIPTION;
+      ExecSQL;
+
+      // Inserir medições
+      SQL.Clear;
+      SQL.Add('INSERT INTO measurements (device_id, timestamp, rain_mm, rain_rate_mm_h, water_level_cm)');
+      SQL.Add('VALUES (:device_id, :timestamp, :rain_mm, :rain_rate, :water_level)');
+
+      ParamByName('device_id').AsString := DEVICE_ID;
+      ParamByName('timestamp').AsString := DATETIME;
+      ParamByName('rain_mm').AsFloat := RAIN_MM;
+      ParamByName('rain_rate').AsFloat := RAIN_INTENSITY;
+      ParamByName('water_level').AsFloat := WATER_LEVEL;
+      ExecSQL;
+
+      // Inserir status do sistema
+      SQL.Clear;
+      SQL.Add('INSERT INTO system_status (device_id, timestamp, battery_voltage, signal_lora, status)');
+      SQL.Add('VALUES (:device_id, :timestamp, :battery_voltage, :signal_lora, :status)');
+
+      ParamByName('device_id').AsString := DEVICE_ID;
+      ParamByName('timestamp').AsString := DATETIME;
+      ParamByName('battery_voltage').AsFloat := BATTERY_VOLTAGE;
+      ParamByName('signal_lora').AsString := SIGNAL_LORA;
+      ParamByName('status').AsString := STATUS;
+      ExecSQL;
+    end;
+
+    qry.Free;
+    erro := '';
+    Result := True;
+
+  except
+    on ex: Exception do
+    begin
+      erro := 'Erro ao inserir dados do sensor: ' + ex.Message;
+      Result := False;
+      if Assigned(qry) then
+        qry.Free;
+    end;
+  end;
+end;
+
+function TSensores.ListarRegistroPluv(order_by: string; out erro: string): TFDQuery;
+var
+  qry: TFDQuery;
+begin
+  try
+    qry := TFDQuery.Create(nil);
+    qry.Connection := Model.Connection.FConnection;
+
+    with qry do
+    begin
+      Active := False;
+      SQL.Clear;
+      SQL.Add('SELECT device_id, timestamp, rain_mm');
+      SQL.Add('FROM measurements');
+      SQL.Add('WHERE rain_mm IS NOT NULL');
+      SQL.Add('  AND rain_mm > 0');
+
+      // Se o usuário quiser listar registros de um dispositivo específico
+      if not DEVICE_ID.IsEmpty then
+      begin
+        SQL.Add('AND device_id = :device_id');
+        ParamByName('device_id').AsString := DEVICE_ID;
+      end;
+
+      // Ordenação — por padrão, ordem decrescente de data
+      if order_by = '' then
+        SQL.Add('ORDER BY timestamp ASC')
+      else
+        SQL.Add('ORDER BY ' + order_by);
+
+      // Limitar a 10 registros
+      SQL.Add('LIMIT 100');
+
+      Active := True;
+    end;
+
+    erro := '';
+    Result := qry;
+
+  except
+    on ex: Exception do
+    begin
+      erro := 'Erro ao consultar registros de chuva: ' + ex.Message;
+      Result := nil;
+    end;
+  end;
+end;
+
+function TSensores.ListarRegistroNivelRio(order_by: string; out erro: string): TFDQuery;
+var
+  qry: TFDQuery;
+begin
+  try
+    qry := TFDQuery.Create(nil);
+    qry.Connection := Model.Connection.FConnection;
+
+    with qry do
+    begin
+      Active := False;
+      SQL.Clear;
+      SQL.Add('SELECT device_id, timestamp, water_level_cm');
+      SQL.Add('FROM (');
+      SQL.Add('    SELECT device_id, timestamp, water_level_cm');
+      SQL.Add('    FROM measurements');
+      SQL.Add('    WHERE water_level_cm IS NOT NULL');
+      SQL.Add('      AND water_level_cm > 0');
+
+      // Filtro opcional
+      if not DEVICE_ID.IsEmpty then
+      begin
+        SQL.Add('      AND device_id = :device_id');
+        ParamByName('device_id').AsString := DEVICE_ID;
+      end;
+
+      // pega os últimos 100 registros
+      SQL.Add('    ORDER BY timestamp DESC');
+      SQL.Add('    LIMIT 100');
+      SQL.Add(') AS last_records');
+
+      // agora reordena em ordem crescente
+      SQL.Add('ORDER BY timestamp ASC');
+
+      Active := True;
+    end;
+
+    erro := '';
+    Result := qry;
+
+  except
+    on ex: Exception do
+    begin
+      erro := 'Erro ao consultar registros de nível de água: ' + ex.Message;
+      Result := nil;
+    end;
+  end;
+end;
+
+function TSensores.ListarModulosTodos(order_by: string; out erro: string): TFDQuery;
+var
+  qry: TFDQuery;
+begin
+  try
+    qry := TFDQuery.Create(nil);
+    qry.Connection := Model.Connection.FConnection;
+
+    with qry do
+    begin
+      Active := False;
+      SQL.Clear;
+      SQL.Add('SELECT device_id, description, device_type');
+      SQL.Add('FROM devices');
+      SQL.Add('WHERE device_id IS NOT NULL');
+
+      SQL.Add('ORDER BY');
+      SQL.Add('  SUBSTR(device_id, 1, 1),');
+      SQL.Add('  CAST(SUBSTR(device_id, 2) AS INTEGER)');
+
+      Active := True;
+    end;
+
+    erro := '';
+    Result := qry;
+
+  except
+    on ex: Exception do
+    begin
+      erro := 'Erro ao buscar a lista de todos os módulos: ' + ex.Message;
+      Result := nil;
+    end;
+  end;
+end;
+
+function TSensores.ListarModulosPluv(order_by: string; out erro: string): TFDQuery;
+var
+  qry: TFDQuery;
+begin
+  try
+    qry := TFDQuery.Create(nil);
+    qry.Connection := Model.Connection.FConnection;
+
+    with qry do
+    begin
+      Active := False;
+      SQL.Clear;
+      SQL.Add('SELECT device_id, description, device_type');
+      SQL.Add('FROM devices');
+      SQL.Add('WHERE device_type = ''b''');
+
+      Active := True;
+    end;
+
+    erro := '';
+    Result := qry;
+
+  except
+    on ex: Exception do
+    begin
+      erro := 'Erro ao buscar a lista de modulos pluviometros: ' + ex.Message;
+      Result := nil;
+    end;
+  end;
+end;
+
+function TSensores.ListarModulosAlerta(order_by: string; out erro: string): TFDQuery;
+var
+  qry: TFDQuery;
+begin
+  try
+    qry := TFDQuery.Create(nil);
+    qry.Connection := Model.Connection.FConnection;
+
+    with qry do
+    begin
+      Active := False;
+      SQL.Clear;
+      SQL.Add('SELECT device_id, description, device_type');
+      SQL.Add('FROM devices');
+      SQL.Add('WHERE device_type IN (''m'', ''a'')');
+
+      Active := True;
+    end;
+
+    erro := '';
+    Result := qry;
+
+  except
+    on ex: Exception do
+    begin
+      erro := 'Erro ao buscar a lista de modulos alertas: ' + ex.Message;
+      Result := nil;
+    end;
+  end;
+end;
+
+function TSensores.ListarModulosNivel(order_by: string; out erro: string): TFDQuery;
+var
+  qry: TFDQuery;
+begin
+  try
+    qry := TFDQuery.Create(nil);
+    qry.Connection := Model.Connection.FConnection;
+
+    with qry do
+    begin
+      Active := False;
+      SQL.Clear;
+      SQL.Add('SELECT device_id, description, device_type');
+      SQL.Add('FROM devices');
+      SQL.Add('WHERE device_type = ''u''');
+
+      Active := True;
+    end;
+
+    erro := '';
+    Result := qry;
+
+  except
+    on ex: Exception do
+    begin
+      erro := 'Erro ao buscar a lista de modulos de medição de nivel: ' + ex.Message;
+      Result := nil;
+    end;
+  end;
+end;
+
+// END =========================================================================================
+
+
+
+
+
+
+// FUNÇÕES ÚTEIS --------------------------------------------------
+
+{function TSensores.Editar(out erro: string): Boolean;
+var
+    qry : TFDQuery;
+begin
+    // Validacoes...
+    if ID_CLIENTE <= 0 then
+    begin
+        Result := false;
+        erro := 'Informe o id. cliente';
+        exit;
+    end;
+
+    try
+        qry := TFDQuery.Create(nil);
+        qry.Connection := Model.Connection.FConnection;
+
+        with qry do
+        begin
+            Active := false;
+            sql.Clear;
+            SQL.Add('UPDATE TAB_CLIENTE SET NOME=:NOME, EMAIL=:EMAIL, FONE=:FONE');
+            SQL.Add('WHERE ID_CLIENTE=:ID_CLIENTE');
+            ParamByName('NOME').Value := NOME;
+            ParamByName('EMAIL').Value := EMAIL;
+            ParamByName('FONE').Value := FONE;
+            ParamByName('ID_CLIENTE').Value := ID_CLIENTE;
+            ExecSQL;
+        end;
+
+        qry.Free;
+        erro := '';
+        result := true;
+
+    except on ex:exception do
+        begin
+            erro := 'Erro ao alterar cliente: ' + ex.Message;
+            Result := false;
+        end;
+    end;
+end; }
+
+{function TSensores.Excluir(out erro: string): Boolean;
+var
+  qry: TFDQuery;
+begin
+  // Validação simples
+  if DEVICE_ID.IsEmpty then
+  begin
+    Result := False;
+    erro := 'O DEVICE_ID não foi informado.';
+    Exit;
+  end;
+
+  try
+    qry := TFDQuery.Create(nil);
+    qry.Connection := Model.Connection.FConnection;
+
+    with qry do
+    begin
+      Active := False;
+      SQL.Clear;
+
+      // ==========================
+      // Excluir status do sistema
+      // ==========================
+      SQL.Add('DELETE FROM system_status WHERE device_id = :device_id');
+      ParamByName('device_id').AsString := DEVICE_ID;
+      ExecSQL;
+
+      // ==========================
+      // Excluir medições
+      // ==========================
+      SQL.Clear;
+      SQL.Add('DELETE FROM measurements WHERE device_id = :device_id');
+      ParamByName('device_id').AsString := DEVICE_ID;
+      ExecSQL;
+
+      // ==========================
+      // Excluir dispositivo
+      // ==========================
+      SQL.Clear;
+      SQL.Add('DELETE FROM devices WHERE device_id = :device_id');
+      ParamByName('device_id').AsString := DEVICE_ID;
+      ExecSQL;
+    end;
+
+    qry.Free;
+    erro := '';
+    Result := True;
+
+  except
+    on ex: Exception do
+    begin
+      erro := 'Erro ao excluir sensor: ' + ex.Message;
+      Result := False;
+      if Assigned(qry) then
+        qry.Free;
+    end;
+  end;
+end; }
+
+end.

@@ -1,0 +1,385 @@
+unit Controller.sensores;
+
+interface
+
+uses
+  Horse,
+  System.JSON,
+  System.SysUtils,
+  Model.Sensores,
+  FireDAC.Comp.Client,
+  Data.DB,
+  DataSet.Serialize;
+
+var
+  mensagemAlerta, nivelVisual, nivelSonoro: string;
+
+procedure Registry;
+
+implementation
+
+// PROCEDURES ==============================================================================
+
+procedure SalvarDados(Req: THorseRequest; Res: THorseResponse; Next: TProc);
+var
+    reg : TSensores;
+    objRegistro: TJSONObject;
+    erro : string;
+    body  : TJsonValue;
+    locationObj, dataObj, systemObj: TJSONObject;
+begin
+    // Conexao com o banco...
+    try
+        reg := TSensores.Create;
+    except
+        res.Send('Erro ao conectar com o banco').Status(500);
+        exit;
+    end;
+
+    try
+        try
+            // Lê o corpo JSON recebido
+            body := TJSONObject.ParseJSONValue(TEncoding.UTF8.GetBytes(req.Body), 0) as TJsonValue;
+
+            // Sub-objetos
+            //locationObj := body.GetValue<TJSONObject>('location');
+            dataObj     := body.GetValue<TJSONObject>('dt');
+            //systemObj   := body.GetValue<TJSONObject>('system');
+
+            // ==== DADOS GERAIS ====
+            reg.DEVICE_ID   := body.GetValue<string>('id', '');
+            reg.DEVICE_TYPE := body.GetValue<string>('tp', '');
+            reg.LATITUDE    := -22.9056;
+            reg.LONGITUDE   := -47.0610;
+            reg.DESCRIPTION := 'Córrego Proença';
+            reg.DATETIME    := FormatDateTime('yyyy-mm-dd hh:nn:ss', Now);
+            reg.STATUS      := 'Ok';
+
+            // ==== DADOS ESPECÍFICOS ====
+            reg.RAIN_MM   := dataObj.GetValue<Double>('Q');
+            reg.RAIN_INTENSITY   := dataObj.GetValue<Double>('I');
+            reg.WATER_LEVEL   := dataObj.GetValue<Double>('N');
+
+            // ==== DADOS DO SISTEMA ====
+            reg.BATTERY_VOLTAGE := 3.88;
+            reg.SIGNAL_LORA     := 'Bom';
+
+            reg.Inserir(erro);
+            if erro <> '' then raise Exception.Create(erro);
+
+            body.Free;
+
+        except
+            on ex: Exception do
+            begin
+                res.Send('Erro ao salvar dados: ' + ex.Message).Status(400);
+                exit;
+            end;
+        end;
+
+        // ==== Retorno JSON ====
+        objRegistro := TJSONObject.Create;
+        objRegistro.AddPair('mensagem', 'Dados inseridos com sucesso');
+        objRegistro.AddPair('device_id', reg.DEVICE_ID);
+        objRegistro.AddPair('tipo', reg.DEVICE_TYPE);
+
+        res.Send<TJSONObject>(objRegistro).Status(201);
+
+    finally
+        reg.Free;
+    end;
+end;
+
+procedure ListarDados(Req: THorseRequest; Res: THorseResponse; Next: TProc);
+var
+  qry: TFDQuery;
+  reg: TSensores;
+  erro: string;
+  arrayRegistros: TJSONArray;
+begin
+  try
+    reg := TSensores.Create;
+  except
+    res.Send('Erro ao conectar com o banco. GET /sensores.').Status(500);
+    exit;
+  end;
+
+  try
+    qry := reg.ListarRegistroNivelRio('', erro);
+    arrayRegistros := qry.ToJSONArray();
+
+    res.Send<TJSONArray>(arrayRegistros);
+  finally
+    qry.Free;
+    reg.Free;
+  end;
+end;
+
+procedure ListarDadosID(Req: THorseRequest; Res: THorseResponse; Next: TProc);
+var
+    reg : TSensores;
+    arrayRegistros: TJSONArray;
+    qry : TFDQuery;
+    erro : string;
+begin
+    try
+        reg := TSensores.Create;
+        reg.DEVICE_ID := Req.Params['id'];
+    except
+        res.Send('Erro ao conectar com o banco').Status(500);
+        exit;
+    end;
+
+    try
+        qry := reg.ListarRegistroNivelRio('', erro);
+
+        if qry.RecordCount > 0 then
+        begin
+            arrayRegistros := qry.ToJSONArray();
+            res.Send<TJSONArray>(arrayRegistros)
+        end
+        else
+            res.Send('Registro não encontrado').Status(404);
+    finally
+        qry.Free;
+        reg.Free;
+    end;
+end;
+
+procedure ListarDadosPluvID(Req: THorseRequest; Res: THorseResponse; Next: TProc);
+var
+    reg : TSensores;
+    arrayRegistros: TJSONArray;
+    qry : TFDQuery;
+    erro : string;
+begin
+    try
+        reg := TSensores.Create;
+        reg.DEVICE_ID := Req.Params['id'];
+    except
+        res.Send('Erro ao conectar com o banco').Status(500);
+        exit;
+    end;
+
+    try
+        qry := reg.ListarRegistroNivelRio('', erro);
+
+        if qry.RecordCount > 0 then
+        begin
+            arrayRegistros := qry.ToJSONArray();
+            res.Send<TJSONArray>(arrayRegistros)
+        end
+        else
+            res.Send('Registro não encontrado').Status(404);
+    finally
+        qry.Free;
+        reg.Free;
+    end;
+end;
+
+procedure ListarDadosNivelID(Req: THorseRequest; Res: THorseResponse; Next: TProc);
+var
+    reg : TSensores;
+    arrayRegistros: TJSONArray;
+    qry : TFDQuery;
+    erro : string;
+begin
+    try
+        reg := TSensores.Create;
+        reg.DEVICE_ID := Req.Params['id'];
+    except
+        res.Send('Erro ao conectar com o banco').Status(500);
+        exit;
+    end;
+
+    try
+        qry := reg.ListarRegistroNivelRio('', erro);
+
+        if qry.RecordCount > 0 then
+        begin
+            arrayRegistros := qry.ToJSONArray();
+            res.Send<TJSONArray>(arrayRegistros)
+        end
+        else
+            res.Send('Registros de nível não encontrados para esse modulo.').Status(404);
+    finally
+        qry.Free;
+        reg.Free;
+    end;
+end;
+
+procedure ListarModulosTodos(Req: THorseRequest; Res: THorseResponse; Next: TProc);
+var
+  qry: TFDQuery;
+  reg: TSensores;
+  erro: string;
+  arrayRegistros: TJSONArray;
+begin
+  try
+    reg := TSensores.Create;
+  except
+    res.Send('Erro ao conectar com o banco. GET /sensores/todos.').Status(500);
+    exit;
+  end;
+
+  try
+    qry := reg.ListarModulosTodos('', erro);
+    arrayRegistros := qry.ToJSONArray();
+
+    res.Send<TJSONArray>(arrayRegistros);
+  finally
+    qry.Free;
+    reg.Free;
+  end;
+end;
+
+procedure ListarModulosPluv(Req: THorseRequest; Res: THorseResponse; Next: TProc);
+var
+  qry: TFDQuery;
+  reg: TSensores;
+  erro: string;
+  arrayRegistros: TJSONArray;
+begin
+  try
+    reg := TSensores.Create;
+  except
+    res.Send('Erro ao conectar com o banco. GET /sensores/pluv.').Status(500);
+    exit;
+  end;
+
+  try
+    qry := reg.ListarModulosPluv('', erro);
+    arrayRegistros := qry.ToJSONArray();
+
+    res.Send<TJSONArray>(arrayRegistros);
+  finally
+    qry.Free;
+    reg.Free;
+  end;
+end;
+
+procedure ListarModulosNivel(Req: THorseRequest; Res: THorseResponse; Next: TProc);
+var
+  qry: TFDQuery;
+  reg: TSensores;
+  erro: string;
+  arrayRegistros: TJSONArray;
+begin
+  try
+    reg := TSensores.Create;
+  except
+    res.Send('Erro ao conectar com o banco. GET /sensores/nivel.').Status(500);
+    exit;
+  end;
+
+  try
+    qry := reg.ListarModulosNivel('', erro);
+    arrayRegistros := qry.ToJSONArray();
+
+    res.Send<TJSONArray>(arrayRegistros);
+  finally
+    qry.Free;
+    reg.Free;
+  end;
+end;
+
+procedure ListarModulosAlerta(Req: THorseRequest; Res: THorseResponse; Next: TProc);
+var
+  qry: TFDQuery;
+  reg: TSensores;
+  erro: string;
+  arrayRegistros: TJSONArray;
+begin
+  try
+    reg := TSensores.Create;
+  except
+    res.Send('Erro ao conectar com o banco. GET /sensores/nivel/listar/alerta.').Status(500);
+    exit;
+  end;
+
+  try
+    qry := reg.ListarModulosAlerta('', erro);
+    arrayRegistros := qry.ToJSONArray();
+
+    res.Send<TJSONArray>(arrayRegistros);
+  finally
+    qry.Free;
+    reg.Free;
+  end;
+end;
+
+procedure ConsultaMensagem(Req: THorseRequest; Res: THorseResponse; Next: TProc);
+begin
+            res.Send(mensagemAlerta).Status(200);
+end;
+
+procedure DefinirMensagem(Req: THorseRequest; Res: THorseResponse; Next: TProc);
+begin
+  mensagemAlerta := req.Body;
+  Writeln('Post recebido em /sensores/alerta/mensagem - ' + FormatDateTime('yyyy-mm-dd hh:nn:ss', Now));
+  Writeln('Mensagem do sistema de alerta visual alterada para: ' + mensagemAlerta);
+  Writeln('');
+  res.Send('Recebido. Mensagem alterada para: ' + mensagemAlerta).Status(201);
+end;
+
+procedure DefinirNivelVisual(Req: THorseRequest; Res: THorseResponse; Next: TProc);
+begin
+  nivelVisual := req.Body;
+  Writeln('Post recebido em /sensores/alerta/nivelvisual - ' + FormatDateTime('yyyy-mm-dd hh:nn:ss', Now));
+  Writeln('Nível crítico para ativação do alerta visual definido em: ' + nivelVisual + ' m.');
+  Writeln('');
+  res.Send('Recebido. Nível crítico alterado para: ' + nivelVisual + ' m.').Status(201);
+end;
+
+procedure DefinirNivelSonoro(Req: THorseRequest; Res: THorseResponse; Next: TProc);
+begin
+  nivelSonoro := req.Body;
+  Writeln('Post recebido em /sensores/alerta/nivelsonoro - ' + FormatDateTime('yyyy-mm-dd hh:nn:ss', Now));
+  Writeln('Nível crítico para ativação do alerta sonoro definido em: ' + nivelSonoro + ' m.');
+  Writeln('');
+  res.Send('Recebido. Nível crítico alterado para: ' + nivelSonoro + ' m.').Status(201);
+end;
+
+
+// REGISTRO DAS ROTAS ========================================================================
+procedure Registry;
+begin
+  // GETS ---------------------------------------------------------
+  // LISTAR DADOS
+  THorse.Get('/sensores', ListarDados);
+  THorse.Get('/sensores/:id', ListarDadosID);
+  THorse.Get('/sensores/dados/pluv/:id', ListarDadosPluvID);
+  THorse.Get('/sensores/dados/nivel/:id', ListarDadosNivelID);
+
+  // LISTAR MODULOS
+  THorse.Get('/sensores/listar/todos', ListarModulosTodos);
+  THorse.Get('/sensores/listar/pluv', ListarModulosPluv);
+  THorse.Get('/sensores/listar/nivel', ListarModulosNivel);
+  THorse.Get('/sensores/listar/alerta', ListarModulosAlerta);
+
+  // CONSULTAR VARIAVEIS
+  THorse.Get('/sensores/alerta/mensagem', ConsultaMensagem);
+
+  // ---------------------------------------------------------------
+
+
+  // POSTS ---------------------------------------------------------
+  // ROTA RAIZ (salvar dados que chegam do LoRa no banco de dados)
+  THorse.Post('/sensores', SalvarDados);
+
+  // ROTAS SISTEMA DE ALERTA
+  THorse.Post('/sensores/alerta/mensagem', DefinirMensagem);
+  THorse.Post('/sensores/alerta/nivelvisual', DefinirNivelVisual);
+  THorse.Post('/sensores/alerta/nivelsonoro', DefinirNivelSonoro);
+
+  // ---------------------------------------------------------------
+end;
+
+
+// INICIALIZAÇÂO DAS VARIAVEIS =====================================
+initialization
+  mensagemAlerta := 'CUIDADO|||||ENCHENTE';
+  nivelVisual := '0';
+  nivelSonoro := '0';
+
+end.

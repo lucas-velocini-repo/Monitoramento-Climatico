@@ -1,0 +1,30 @@
+program ServerMonitoramentoRios_Horse;
+
+{$APPTYPE CONSOLE}
+
+{$R *.res}
+
+uses
+  Horse,
+  System.JSON,
+  Horse.Jhonson,
+  System.SysUtils,
+  Controller.sensores in 'Controller\Controller.sensores.pas',
+  Model.Connection in 'Model\Model.Connection.pas';
+
+begin
+  Controller.sensores.Registry;
+
+  Writeln('*====================================================================*');
+  Writeln('|                    Servidor Horse iniciado!                        |');
+  Writeln('|                                                                    |');
+  Writeln('|                         PINK FLUIDOS                               |');
+  Writeln('|   Monitoramento de Rios com Alertas Preventivos para População     |');
+  Writeln('|                                                                    |');
+  Writeln('|                 Ouvindo em: http://localhost:9000                  |');
+  Writeln('*====================================================================*');
+  Writeln('');
+  Writeln('');
+  Writeln('');
+  THorse.Listen(9000)
+end.
