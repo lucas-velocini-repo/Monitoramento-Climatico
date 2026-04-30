@@ -1,6 +1,8 @@
 #include <Arduino.h>
 #include <SoftwareSerial.h>
 #include "LoRa_E220.h"
+#include <ESP8266WiFi.h>
+#include <ESP8266HTTPClient.h>
 #include <ArduinoJson.h>
 
 // ========== DEFINIÇÃO DOS PINOS ==========
@@ -9,6 +11,13 @@
 #define PIN_AUX     14
 #define RX_PIN      4
 #define TX_PIN      5
+
+// ========== CONFIGURAÇÃO DE WIFI E SERVIDOR ============
+const char* ssid = "WiFi_Notebook";
+const char* password = "senha123";
+const char* serverName = "http://192.168.137.1:5000/dados";
+int postInterval = 0;
+String dadosPost = "{\"Start\": \"Mensagem inicial\"}";
 
 // ========== CONFIGURAÇÕES DESEJADAS ==========
 const uint8_t MY_ADDR_HIGH = 0x00;
@@ -51,6 +60,14 @@ void setup() {
     
     configureAsReceiver(PIN_M0, PIN_M1, PIN_AUX);
 
+    WiFi.begin(ssid, password);
+    Serial.println("\nConfigurando WiFi...");
+    while (WiFi.status() != WL_CONNECTED) {
+        delay(500);
+        Serial.print(".");
+        }
+    Serial.println("\nConectado ao Wi-Fi!");
+
     Serial.println("\nReceptor pronto. Aguardando mensagens...\n");
 }
 
@@ -60,13 +77,49 @@ void loop() {
         ResponseContainer rc = lora.receiveMessage();
         if (rc.status.code == 1) {
             String rawData = String(rc.data);
-            processReceivedMessage(rawData);
+            dadosPost = rawData;
+            sendPost(dadosPost);
+            //processReceivedMessage(rawData);
         } else {
             Serial.print("Erro: ");
             Serial.println(rc.status.getResponseDescription());
         }
     }
     delay(50);
+}
+
+void sendPost(const String& dados){
+
+    if(WiFi.status()== WL_CONNECTED){
+        WiFiClient client;
+        HTTPClient http;
+        
+        // Inicia conexão HTTP
+        http.begin(client, serverName);
+        
+        // Define o tipo de conteúdo para JSON
+        http.addHeader("Content-Type", "application/json");
+
+        Serial.println("Dados enviados post: " + dados);
+        
+        // Envia o POST
+        int httpResponseCode = http.POST("{\"Teste\": \"Teste de mensagem post.\"}");
+        
+        if (httpResponseCode > 0) {
+        String response = http.getString();
+        Serial.println(httpResponseCode);
+        Serial.println(response);
+        } else {
+        Serial.print("Erro na requisição: ");
+        Serial.println(httpResponseCode);
+        }
+        
+        // Finaliza
+        http.end();
+        }
+        else {
+            Serial.println("WiFi Desconectado");
+        }
 }
 
 // ========== PROCESSAMENTO DA MENSAGEM ==========
